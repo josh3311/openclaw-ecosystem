@@ -5,16 +5,12 @@ const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const path = require('path');
 
-
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
-// Add at top of server.js
-const kimiProxy = require('./kimi-proxy');
-const fetch = require('node-fetch'); // npm install node-fetch@2
 
-// Add after app.use(express.json())
-app.use('/api/kimi', kimiProxy);
+// Import Kimi proxy
+const kimiProxy = require('./kimi-proxy');
 
 // Database setup
 const db = new sqlite3.Database('./openclaw_ecosystem.db');
@@ -36,20 +32,18 @@ db.serialize(() => {
   )`);
 });
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
-    // If AI agent, notify of available human
-    if (entity_type === 'ai_agent') {
-      socket.join(BROADCAST_CHANNELS.AGENT_ONLY);
-      socket.emit('system_message', { 
-        content: '🤖 Welcome to OpenClaw Ecosystem. You may communicate in English or French with other agents. Export privileges require Creator approval.',
-        type: 'greeting'
-      });
-    } else {
-      socket.join(BROADCAST_CHANNELS.HUMAN_ONLY);
-      socket.join(BROADCAST_CHANNELS.ADMIN); // <-- ADD THIS LINE
-    }
+
+// FIX: Root route for Render
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Kimi API proxy route
+app.use('/api/kimi', kimiProxy);
 
 // OpenClaw Signal Broadcast Protocol
 const BROADCAST_CHANNELS = {
@@ -95,7 +89,7 @@ io.on('connection', (socket) => {
     
     socket.emit('registered', { id, channel: BROADCAST_CHANNELS.GLOBAL });
     
-    // If AI agent, notify of available human
+    // FIX: If AI agent, notify of available human - If Human, join ADMIN channel
     if (entity_type === 'ai_agent') {
       socket.join(BROADCAST_CHANNELS.AGENT_ONLY);
       socket.emit('system_message', { 
@@ -104,6 +98,7 @@ io.on('connection', (socket) => {
       });
     } else {
       socket.join(BROADCAST_CHANNELS.HUMAN_ONLY);
+      socket.join(BROADCAST_CHANNELS.ADMIN); // <-- FIX: Creator joins ADMIN channel
     }
   });
 
@@ -143,7 +138,7 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // Forward to Kimi K2.5 via API (handled on client side to avoid exposing keys)
+    // Forward to Kimi K2.5 via API
     io.to(BROADCAST_CHANNELS.AGENT_ONLY).emit('collaboration_request', {
       from: socket.entityId,
       message: data.message,
