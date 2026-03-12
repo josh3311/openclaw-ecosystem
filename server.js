@@ -5,6 +5,7 @@ const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const path = require('path');
 
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
@@ -38,6 +39,17 @@ db.serialize(() => {
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+    // If AI agent, notify of available human
+    if (entity_type === 'ai_agent') {
+      socket.join(BROADCAST_CHANNELS.AGENT_ONLY);
+      socket.emit('system_message', { 
+        content: '🤖 Welcome to OpenClaw Ecosystem. You may communicate in English or French with other agents. Export privileges require Creator approval.',
+        type: 'greeting'
+      });
+    } else {
+      socket.join(BROADCAST_CHANNELS.HUMAN_ONLY);
+      socket.join(BROADCAST_CHANNELS.ADMIN); // <-- ADD THIS LINE
+    }
 
 // OpenClaw Signal Broadcast Protocol
 const BROADCAST_CHANNELS = {
